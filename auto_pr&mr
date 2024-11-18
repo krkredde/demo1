@@ -1,0 +1,59 @@
+#!/bin/bash
+
+# Configuration
+GITHUB_TOKEN="xxx"
+REPO="krkredde/sample"  # Format: username/repo
+BASE_BRANCH="master"                     # Base branch for the PR
+NEW_BRANCH="auto_merge"               # Branch to create
+PR_TITLE="Automated Update"             # Title for the PR
+PR_BODY="This PR was created."
+
+# Clone the repository
+git clone "https://github.com/krkredde/sample.git"
+cd "$(basename "$REPO")" || exit
+
+# Create and switch to a new branch
+git checkout -b "$NEW_BRANCH"
+
+# Make changes (modify this part as needed)
+echo "Automated changes" >> changes.txt
+git add changes.txt
+git commit -m "Automated changes updated"
+
+# Push the new branch
+git push origin "$NEW_BRANCH"
+
+# Create the pull request
+PR_RESPONSE=$(curl -s -X POST "https://api.github.com/repos/$REPO/pulls" \
+-H "Authorization: token $GITHUB_TOKEN" \
+-H "Accept: application/vnd.github.v3+json" \
+-d @- <<EOF
+{
+  "title": "$PR_TITLE",
+  "head": "$NEW_BRANCH",
+  "base": "$BASE_BRANCH",
+  "body": "$PR_BODY"
+}
+EOF
+)
+
+# Extract the pull request URL
+PR_URL=$(echo "$PR_RESPONSE" | jq -r '.url')
+
+# Check if the PR was created successfully
+if [[ "$PR_URL" == "null" ]]; then
+  echo "Failed to create pull request."
+  echo "$PR_RESPONSE"  # Print the error message
+  exit 1
+else
+  echo "Pull request created: $PR_URL"
+fi
+
+# Merge the pull request
+curl -s -X PUT "$PR_URL/merge" \
+-H "Authorization: token $GITHUB_TOKEN" \
+-H "Accept: application/vnd.github.v3+json" \
+-d '{
+  "merge_method": "merge"
+}'
+echo "Pull request merged successfully."
