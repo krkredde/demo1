@@ -1,0 +1,65 @@
+import os
+import subprocess
+import requests
+import json
+
+# Configuration
+GITHUB_TOKEN = "xxx"
+REPO = "krkredde/demo1"  # Format: username/repo
+BASE_BRANCH = "master"    # Base branch for the PR
+NEW_BRANCH = "auto_merge"  # Branch to create
+PR_TITLE = "Automated Update"  # Title for the PR
+PR_BODY = "This PR was created."
+
+# Clone the repository
+repo_url = f"https://github.com/{REPO}.git"
+subprocess.run(["git", "clone", repo_url])
+repo_name = REPO.split('/')[-1]
+os.chdir(repo_name)
+
+# Create and switch to a new branch
+subprocess.run(["git", "checkout", "-b", NEW_BRANCH])
+
+# Make changes (modify this part as needed)
+with open("changes.txt", "a") as f:
+    f.write("Automated changes\n")
+
+subprocess.run(["git", "add", "changes.txt"])
+subprocess.run(["git", "commit", "-m", "Automated changes updated"])
+
+# Push the new branch
+subprocess.run(["git", "push", "origin", NEW_BRANCH])
+
+# Create the pull request
+pr_data = {
+    "title": PR_TITLE,
+    "head": NEW_BRANCH,
+    "base": BASE_BRANCH,
+    "body": PR_BODY
+}
+headers = {
+    "Authorization": f"token {GITHUB_TOKEN}",
+    "Accept": "application/vnd.github.v3+json"
+}
+
+response = requests.post(f"https://api.github.com/repos/{REPO}/pulls", headers=headers, data=json.dumps(pr_data))
+
+# Extract the pull request URL
+pr_response = response.json()
+pr_url = pr_response.get('url')
+
+# Check if the PR was created successfully
+if pr_url is None:
+    print("Failed to create pull request.")
+    print(pr_response)  # Print the error message
+else:
+    print(f"Pull request created: {pr_url}")
+
+    # Merge the pull request
+    merge_response = requests.put(f"{pr_url}/merge", headers=headers, data=json.dumps({"merge_method": "merge"}))
+    
+    if merge_response.status_code == 200:
+        print("Pull request merged successfully.")
+    else:
+        print("Failed to merge pull request.")
+        print(merge_response.json())
