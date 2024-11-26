@@ -57,3 +57,20 @@ curl -s -X PUT "$PR_URL/merge" \
   "merge_method": "merge"
 }'
 echo "Pull request merged successfully."
+
+######################
+
+# Create the pull request using GitHub API without using EOF
+PR_RESPONSE=$(curl -s -X POST "https://api.github.com/repos/$REPO/pulls" \
+-H "Authorization: token $GITHUB_TOKEN" \
+-H "Accept: application/vnd.github.v3+json" \
+-d "$(printf '{
+  "title": "%s",
+  "head": "%s",
+  "base": "%s",
+  "body": "%s"
+}' "$PR_TITLE" "$NEW_BRANCH" "$BASE_BRANCH" "$PR_BODY")")
+
+# Extract the PR URL without using jq
+PR_URL=$(echo "$PR_RESPONSE" | grep -o '"html_url": "[^"]*' | sed 's/"html_url": "//')
+
