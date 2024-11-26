@@ -74,3 +74,13 @@ PR_RESPONSE=$(curl -s -X POST "https://api.github.com/repos/$REPO/pulls" \
 # Extract the PR URL without using jq
 PR_URL=$(echo "$PR_RESPONSE" | grep -o '"html_url": "[^"]*' | sed 's/"html_url": "//')
 
+
+# Check if the PR was created successfully
+if [[ -z "$PR_URL" ]]; then
+  echo "Failed to create pull request."
+  echo "$PR_RESPONSE"  # Print the error message from the API response
+  exit 1
+else
+  echo "Pull request created successfully: $PR_URL"
+fi
+
