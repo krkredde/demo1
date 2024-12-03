@@ -1,0 +1,76 @@
+#!/bin/bash
+
+# Variables (edit these)
+GITHUB_USERNAME="your_github_username"
+GITHUB_REPO="your_github_repo"
+BRANCH_NAME="develop"           # Branch you are merging from (usually 'develop')
+BASE_BRANCH="qa"                # Branch you are merging into (usually 'qa')
+PR_TITLE="Merge Develop to QA"  # Title for the Pull Request
+PR_BODY="This PR merges changes from develop to qa"  # Body for the Pull Request
+GITHUB_TOKEN="your_github_personal_access_token"  # GitHub Personal Access Token
+
+# Create a new branch (if needed)
+git checkout $BRANCH_NAME
+
+# Push the develop branch to GitHub (if not already pushed)
+git push origin $BRANCH_NAME
+
+# Create Pull Request via GitHub API
+PR_RESPONSE=$(curl -s -X POST \
+  -H "Authorization: token $GITHUB_TOKEN" \
+  -d "{\"title\":\"$PR_TITLE\",\"head\":\"$BRANCH_NAME\",\"base\":\"$BASE_BRANCH\",\"body\":\"$PR_BODY\"}" \
+  "https://api.github.com/repos/$GITHUB_USERNAME/$GITHUB_REPO/pulls")
+
+# Extract the PR URL and ID
+PR_URL=$(echo "$PR_RESPONSE" | grep -o '"url": "[^"]*' | cut -d '"' -f 4)
+PR_ID=$(echo "$PR_RESPONSE" | grep -o '"number": [0-9]*' | cut -d ':' -f 2 | tr -d ' ')
+
+if [ -z "$PR_URL" ]; then
+  echo "Error creating Pull Request"
+  echo "$PR_RESPONSE"
+  exit 1
+fi
+
+echo "Pull Request created: $PR_URL"
+
+# Wait for PR checks to complete
+echo "Waiting for PR checks to pass..."
+
+# Poll the PR status to check for passing status
+while true; do
+  PR_STATUS=$(curl -s -H "Authorization: token $GITHUB_TOKEN" \
+    "https://api.github.com/repos/$GITHUB_USERNAME/$GITHUB_REPO/pulls/$PR_ID")
+  
+  # Check if PR is mergeable by looking for the "mergeable" field in the response
+  MERGEABLE=$(echo "$PR_STATUS" | grep -o '"mergeable":.*' | cut -d ':' -f 2 | tr -d ' ')
+
+  if [ "$MERGEABLE" == "true" ]; then
+    echo "PR checks are successful and PR is mergeable."
+    break
+  elif [ "$MERGEABLE" == "false" ]; then
+    echo "PR is not mergeable due to conflicts."
+    exit 1
+  else
+    echo "PR checks are still pending. Waiting..."
+    sleep 30  # Sleep for a minute before checking again
+  fi
+done
+
+# Merge develop to qa after PR is successful
+echo "Merging $BRANCH_NAME into $BASE_BRANCH"
+
+# Checkout the 'qa' branch and pull the latest updates
+git checkout $BASE_BRANCH
+git pull origin $BASE_BRANCH
+
+# Merge the 'develop' branch into 'qa'
+git merge $BRANCH_NAME
+
+# Resolve merge conflicts if any (manual intervention needed)
+# If no conflicts, continue to commit the merge
+git commit -m "Merge $BRANCH_NAME into $BASE_BRANCH"
+
+# Push the changes to the remote 'qa' branch
+git push origin $BASE_BRANCH
+
+echo "Successfully merged $BRANCH_NAME into $BASE_BRANCH."
