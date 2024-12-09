@@ -3,7 +3,7 @@
 # This script automates the process of creating a PR, checking CI status, and merging
 
 # Configuration variables
-BRANCH_NAME="auto_merge"
+BRANCH_NAME="auto_merge" #branch name
 BASE_BRANCH="main"  # Default to "main" if no base branch is provided
 PR_TITLE=${3:-"Automated PR"}
 PR_BODY=${4:-"This is an automated pull request created by a script."}
